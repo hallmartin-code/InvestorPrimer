@@ -8,6 +8,10 @@ one-page **Customer Journey Market Narrative** PDF.
 `extractor.py` (pypdf / python-pptx) → `analyzer.py` (Claude, JSON → Pydantic) →
 `builder.py` (reportlab) → one Letter page.
 
+Two front ends drive that pipeline: `cli.py` (Click) and `web.py` (FastAPI,
+deployed via `railpack.json`). Both are thin — analysis logic stays in the
+pipeline modules.
+
 ## Conventions
 
 - **Model:** `claude-sonnet-4-6`, `max_tokens=4096`, one call per deck.
@@ -15,7 +19,9 @@ one-page **Customer Journey Market Narrative** PDF.
   `ANTHROPIC_API_KEY` comes from the environment or `.env`.
 - **Errors:** all defined in `utils.py`. `FileError`/`BuildError` → exit 1,
   `ExtractionError`/`AnalysisError` → exit 2, `APIError` → exit 3. The CLI is the
-  only place that calls `sys.exit`.
+  only place that calls `sys.exit`. `web.py` maps the same errors to HTTP:
+  `FileError` → 400, `Extraction`/`AnalysisError` → 422, `APIError` → 503,
+  `BuildError` → 500.
 - **Layout:** all geometry, colour, and typography constants live in
   `templates/onepager_layout.py` — never hardcode a coordinate or hex value in
   `builder.py`. Positions are measured from the *page top*; `L.y()` converts to

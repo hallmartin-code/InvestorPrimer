@@ -70,6 +70,45 @@ No API key is ever read from or written to source. `.env` is gitignored.
 
 ---
 
+## Web service
+
+The same pipeline runs as a small HTTP service so a deck can be dropped in from
+a browser instead of the shell.
+
+```bash
+uvicorn pitch2onepager.web:app --reload --port 8000
+# then open http://127.0.0.1:8000
+```
+
+| Route            | Purpose |
+| ---------------- | ------- |
+| `GET /`          | Upload page (drag-and-drop, `.pdf` / `.pptx`, 25 MB cap) |
+| `POST /generate` | Multipart `file` field → the rendered one-pager PDF |
+| `GET /healthz`   | Liveness probe; reports whether `ANTHROPIC_API_KEY` is set |
+
+Failures map to status codes the same way the CLI maps to exit codes: `400`
+unsupported/empty file, `413` too large, `422` unusable deck text or bad model
+output, `503` missing/rejected API key, `500` PDF write failure. The body is
+always `{"error": "..."}`.
+
+### Deploying to Railway
+
+`railpack.json` declares the start command, so the build detects the service
+automatically. Set these variables on the Railway service:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...   # required
+APP_PASSWORD=...               # optional; when set, the upload form requires it
+PITCH2ONEPAGER_MODEL=...       # optional model override
+```
+
+`PORT` is injected by the platform. Point the health check at `/healthz`.
+
+Leaving `APP_PASSWORD` unset makes the URL public — anyone who finds it can
+spend your Anthropic credits.
+
+---
+
 ## How it works
 
 ```
@@ -112,6 +151,7 @@ pitch2onepager/
 ├── extractor.py   PDF/PPTX → DeckContent
 ├── analyzer.py    DeckContent → CustomerJourneyAnalysis (Claude)
 ├── builder.py     CustomerJourneyAnalysis → one-page PDF (reportlab)
+├── web.py         FastAPI wrapper: upload page + /generate endpoint
 ├── models.py      Pydantic v2 schema for every structure above
 └── utils.py       Errors, file-type detection, text cleaning
 
